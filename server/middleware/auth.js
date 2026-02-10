@@ -1,0 +1,15 @@
+import jwt from 'jsonwebtoken'
+
+export const requireAuth = (req, res, next) => {
+  try {
+    const token = req.cookies?.token
+    if (!token) {
+      return res.status(401).json({ message: 'Not authenticated.' })
+    }
+    const payload = jwt.verify(token, process.env.JWT_SECRET)
+    req.userId = payload.sub
+    return next()
+  } catch (error) {
+    return res.status(401).json({ message: 'Not authenticated.' })
+  }
+}
