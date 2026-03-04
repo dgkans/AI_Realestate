@@ -37,21 +37,24 @@ const startServer = async () => {
   if (!process.env.JWT_SECRET) {
     console.error('JWT_SECRET not set. Auth routes will not work correctly.')
   }
-  if (process.env.MONGO_URI) {
-    try {
-      await mongoose.connect(process.env.MONGO_URI)
-      console.log('MongoDB connected')
-      await seedListings()
-    } catch (error) {
-      console.error('MongoDB connection error:', error.message)
-    }
-  } else {
-    console.warn('MONGO_URI not set. Skipping MongoDB connection for now.')
-  }
-
   app.listen(PORT, () => {
     console.log(`API server running on http://localhost:${PORT}`)
   })
+
+  if (!process.env.MONGO_URI) {
+    console.warn('MONGO_URI not set. Skipping MongoDB connection for now.')
+    return
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    })
+    console.log('MongoDB connected')
+    await seedListings()
+  } catch (error) {
+    console.error('MongoDB connection error:', error.message)
+  }
 }
 
 startServer()
