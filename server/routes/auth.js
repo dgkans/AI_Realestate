@@ -97,6 +97,52 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out.' })
 })
 
+router.patch('/profile', async (req, res) => {
+  try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: 'JWT secret not configured.' })
+    }
+    const token = req.cookies?.token
+    if (!token) {
+      return res.status(401).json({ message: 'Not authenticated.' })
+    }
+
+    const payload = jwt.verify(token, process.env.JWT_SECRET)
+    const { preferredBudget, riskTolerance } = req.body || {}
+
+    const update = {}
+    if (typeof preferredBudget === 'number' && preferredBudget >= 0) {
+      update.preferredBudget = preferredBudget
+    } else if (preferredBudget === null || preferredBudget === '') {
+      update.preferredBudget = null
+    }
+    if (['low', 'medium', 'high', ''].includes(riskTolerance)) {
+      update.riskTolerance = riskTolerance
+    }
+
+    const user = await User.findByIdAndUpdate(
+      payload.sub,
+      { $set: update },
+      { new: true }
+    ).select('username email avatarUrl preferredBudget riskTolerance')
+
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated.' })
+    }
+
+    return res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      preferredBudget: user.preferredBudget ?? null,
+      riskTolerance: user.riskTolerance || null,
+    })
+  } catch (error) {
+    return res.status(401).json({ message: 'Not authenticated.' })
+  }
+})
+
 router.get('/me', async (req, res) => {
   try {
     if (!process.env.JWT_SECRET) {
@@ -108,7 +154,7 @@ router.get('/me', async (req, res) => {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET)
-    const user = await User.findById(payload.sub).select('username email avatarUrl')
+    const user = await User.findById(payload.sub).select('username email avatarUrl preferredBudget riskTolerance')
     if (!user) {
       return res.status(401).json({ message: 'Not authenticated.' })
     }
@@ -118,6 +164,8 @@ router.get('/me', async (req, res) => {
       username: user.username,
       email: user.email,
       avatarUrl: user.avatarUrl,
+      preferredBudget: user.preferredBudget ?? null,
+      riskTolerance: user.riskTolerance || null,
     })
   } catch (error) {
     return res.status(401).json({ message: 'Not authenticated.' })

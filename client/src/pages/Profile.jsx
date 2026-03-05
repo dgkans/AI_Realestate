@@ -96,6 +96,40 @@ export default function Profile() {
           </Card>
 
           <Card className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100">Preferences</h3>
+                <p className="text-sm text-slate-400">
+                  Budget and risk tolerance help us personalize AI insights and recommendations.
+                </p>
+              </div>
+              <Button as={Link} to="/profile/update" variant="outline" className="shrink-0">
+                Edit
+              </Button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-6 rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                  Preferred budget
+                </p>
+                <p className="mt-1 text-slate-100">
+                  {currentUser?.preferredBudget != null && currentUser?.preferredBudget > 0
+                    ? `$${Number(currentUser.preferredBudget).toLocaleString()}`
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                  Risk tolerance
+                </p>
+                <p className="mt-1 capitalize text-slate-100">
+                  {currentUser?.riskTolerance || 'Not set'}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <h3 className="text-lg font-semibold text-slate-100">My Listings</h3>
