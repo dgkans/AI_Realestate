@@ -1,6 +1,31 @@
 import bcrypt from 'bcryptjs'
+import axios from 'axios'
 import Listing from '../models/Listing.js'
 import User from '../models/User.js'
+
+const KING_COUNTY_CITIES = ['Seattle', 'Bellevue', 'Kirkland', 'Redmond', 'Renton', 'Issaquah']
+
+const CITY_COORDS = {
+  Seattle: { lat: 47.6062, lng: -122.3321 },
+  Bellevue: { lat: 47.6101, lng: -122.2015 },
+  Kirkland: { lat: 47.6769, lng: -122.2059 },
+  Redmond: { lat: 47.6731, lng: -122.1215 },
+  Renton: { lat: 47.4829, lng: -122.2171 },
+  Issaquah: { lat: 47.5301, lng: -122.0326 },
+}
+
+const KING_COUNTY_ZIPCODES = [98178, 98103, 98052, 98004, 98006, 98033, 98059, 98115]
+
+const ML_BASE_URL = process.env.ML_BASE_URL || 'http://127.0.0.1:8000'
+
+const randomFromArray = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+
+const randomFloors = () => {
+  const opts = [1, 1.5, 2, 2.5]
+  return opts[Math.floor(Math.random() * opts.length)]
+}
 
 const seedData = [
   {
@@ -321,9 +346,6 @@ const seedData = [
 ]
 
 export const seedListings = async () => {
-  const count = await Listing.countDocuments()
-  if (count > 0) return
-
   let systemUser = await User.findOne({ email: 'system@gdrealty.com' })
   if (!systemUser) {
     const passwordHash = await bcrypt.hash('SystemPass123!', 10)
@@ -336,11 +358,113 @@ export const seedListings = async () => {
     })
   }
 
-  const listings = seedData.map((item) => ({
-    ...item,
-    ownerId: systemUser._id,
-    ownerName: systemUser.username,
-  }))
+  // Only skip seeding if this system user already has demo listings.
+  const existingDemoCount = await Listing.countDocuments({ ownerId: systemUser._id })
+  if (existingDemoCount > 0) return
+
+  const listings = await Promise.all(
+    seedData.map(async (item, index) => {
+      const base = {
+        ...item,
+        ownerId: systemUser._id,
+        ownerName: systemUser.username,
+      }
+
+      if (item.type !== 'buy') {
+        return base
+      }
+
+      const bedrooms = typeof item.beds === 'number' && item.beds > 0 ? item.beds : 3
+      const bathrooms = typeof item.baths === 'number' && item.baths > 0 ? item.baths : 2
+
+      // Generate ML feature fields with deliberate diversity across listings
+      const sizeFactor = 0.8 + (index % 4) * 0.2 // 0.8, 1.0, 1.2, 1.4 pattern
+      let sqftLiving = Math.round((900 + bedrooms * 400) * sizeFactor)
+      sqftLiving = Math.min(Math.max(sqftLiving, 900), 3500)
+
+      const lotFactor = 0.7 + (index % 5) * 0.15 // 0.7 -> 1.3
+      let sqftLot = Math.round(4000 * lotFactor)
+      sqftLot = Math.min(Math.max(sqftLot, 2000), 12000)
+
+      const floors = randomFloors()
+      const zipcode = KING_COUNTY_ZIPCODES[index % KING_COUNTY_ZIPCODES.length]
+      const yr_built = randomInt(1950 + (index % 5) * 10, 2020 - (index % 5) * 3)
+
+      const cityName = KING_COUNTY_CITIES[index % KING_COUNTY_CITIES.length]
+      const baseCoords = CITY_COORDS[cityName] || CITY_COORDS.Seattle
+      const latJitter = (Math.random() - 0.5) * 0.02
+      const lngJitter = (Math.random() - 0.5) * 0.02
+      const lat = baseCoords.lat + latJitter
+      const lng = baseCoords.lng + lngJitter
+
+      const mlPayload = {
+        bedrooms,
+        bathrooms,
+        sqft_living: sqftLiving,
+        sqft_lot: sqftLot,
+        floors,
+        zipcode,
+        yr_built,
+        listed_price: item.price,
+      }
+
+      const bucket = index % 3
+      const noise = Math.random() * 0.06 - 0.03 // small jitter in [-3%, +3%]
+      const isOverpricedBucket = bucket === 0
+      const isUnderpricedBucket = bucket === 2
+
+      let finalPrice
+
+      try {
+        const response = await axios.post(`${ML_BASE_URL}/predict`, mlPayload, {
+          timeout: 4000,
+        })
+        const rawPred = Number(response.data?.predicted_price)
+        if (!Number.isFinite(rawPred)) {
+          throw new Error('Invalid prediction from ML service')
+        }
+
+        if (isOverpricedBucket) {
+          // Keep a visibly overpriced segment for demo comparisons.
+          finalPrice = rawPred * (1 + 0.25 + noise)
+        } else if (isUnderpricedBucket) {
+          // Guarantee underpriced demo listings under $360k.
+          const discount = 0.15 + Math.random() * 0.1 // 15% -> 25% below prediction
+          const discounted = rawPred * (1 - discount)
+          const minUnderpriced = rawPred * 0.88 // at least 12% below prediction
+          finalPrice = Math.min(discounted, minUnderpriced, 359000)
+        } else {
+          finalPrice = rawPred * (1 + noise)
+        }
+      } catch (error) {
+        // Fallback heuristic if ML service is unavailable, still shaped by buckets
+        const heuristic = sqftLiving * 350 + bedrooms * 20000
+
+        if (isOverpricedBucket) {
+          finalPrice = heuristic * (1 + 0.25 + noise)
+        } else if (isUnderpricedBucket) {
+          finalPrice = Math.min(heuristic * 0.8, heuristic * 0.88, 359000)
+        } else {
+          finalPrice = heuristic * (1 + noise)
+        }
+      }
+
+      finalPrice = Math.round(Math.min(Math.max(finalPrice, 150000), 2000000))
+
+      return {
+        ...base,
+        price: finalPrice,
+        city: cityName,
+        lat,
+        lng,
+        sqft_living: sqftLiving,
+        sqft_lot: sqftLot,
+        floors,
+        zipcode,
+        yr_built,
+      }
+    })
+  )
 
   await Listing.insertMany(listings)
 }

@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import cookieParser from 'cookie-parser'
 import authRoutes from './routes/auth.js'
 import listingsRoutes from './routes/listings.js'
+import mlRoutes from './routes/ml.js'
 import { seedListings } from './seed/seedListings.js'
 
 dotenv.config()
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/listings', listingsRoutes)
+app.use('/api/ml', mlRoutes)
 
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)

@@ -14,6 +14,7 @@ const defaultFilters = {
   minPrice: '',
   maxPrice: '',
   type: '',
+  sort: '',
 }
 
 export default function Listings() {
@@ -27,6 +28,7 @@ export default function Listings() {
     minPrice: searchParams.get('minPrice') || '',
     maxPrice: searchParams.get('maxPrice') || '',
     type: searchParams.get('type') || '',
+    sort: searchParams.get('sort') || '',
   }
 
   const updateFilters = (nextFilters) => {
@@ -62,7 +64,7 @@ export default function Listings() {
   }, [])
 
   const filteredListings = useMemo(() => {
-    return listingsData.filter((listing) => {
+    const filtered = listingsData.filter((listing) => {
       if (filters.city && !listing.city.toLowerCase().includes(filters.city.toLowerCase())) {
         return false
       }
@@ -71,6 +73,15 @@ export default function Listings() {
       if (filters.maxPrice && listing.price > Number(filters.maxPrice)) return false
       return true
     })
+
+    if (filters.sort === 'price_asc') {
+      return [...filtered].sort((a, b) => a.price - b.price)
+    }
+    if (filters.sort === 'price_desc') {
+      return [...filtered].sort((a, b) => b.price - a.price)
+    }
+
+    return filtered
   }, [filters, listingsData])
 
   useEffect(() => {
@@ -101,7 +112,7 @@ export default function Listings() {
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
         <div className="flex flex-col gap-6">
           <Card className="p-5">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <Input
                 label="City"
                 placeholder="Search city"
@@ -138,6 +149,20 @@ export default function Listings() {
                   <option value="">Any</option>
                   <option value="buy">Buy</option>
                   <option value="rent">Rent</option>
+                </select>
+              </label>
+              <label className="flex w-full flex-col gap-2 text-sm font-medium text-slate-200">
+                <span>Sort by</span>
+                <select
+                  className="w-full rounded-xl border border-slate-700/80 bg-slate-900/60 px-4 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                  value={filters.sort}
+                  onChange={(event) =>
+                    updateFilters({ ...filters, sort: event.target.value })
+                  }
+                >
+                  <option value="">Default</option>
+                  <option value="price_asc">Price (low to high)</option>
+                  <option value="price_desc">Price (high to low)</option>
                 </select>
               </label>
             </div>

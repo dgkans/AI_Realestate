@@ -1,0 +1,54 @@
+{
+  "comparables": [
+    {
+      "price": 221900.0,
+      "bedrooms": 3,
+      "bathrooms": 1.0,
+      "sqft_living": 1180,
+      "sqft_lot": 5650,
+      "floors": 1.0,
+      "zipcode": 98178,
+      "yr_built": 1955
+    },
+    {
+      "price": 407000.0,
+      "bedrooms": 3,
+      "bathrooms": 1.0,
+      "sqft_living": 1140,
+      "sqft_lot": 7785,
+      "floors": 1.0,
+      "zipcode": 98177,
+      "yr_built": 1954
+    },
+    {
+      "price": 239300.0,
+      "bedrooms": 3,
+      "bathrooms": 1.0,
+      "sqft_living": 1070,
+      "sqft_lot": 5750,
+      "floors": 1.0,
+      "zipcode": 98178,
+      "yr_built": 1952
+    },
+    {
+      "price": 380000.0,
+      "bedrooms": 3,
+      "bathrooms": 1.0,
+      "sqft_living": 1260,
+      "sqft_lot": 7980,
+      "floors": 1.0,
+      "zipcode": 98177,
+      "yr_built": 1951
+    },
+    {
+      "price": 263700.0,
+      "bedrooms": 3,
+      "bathrooms": 1.0,
+      "sqft_living": 1200,
+      "sqft_lot": 6561,
+      "floors": 1.0,
+      "zipcode": 98177,
+      "yr_built": 1950
+    }
+  ]
+}

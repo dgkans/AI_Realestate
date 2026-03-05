@@ -9,7 +9,27 @@ UI-first MVP for the real estate platform. This milestone focuses on polished UI
 
 ## Quick Start
 
-### 1) Server
+### 1) Start ML service
+From `ml_service/` (after creating a virtualenv and installing `requirements.txt` as described in `ml_service/README.md`):
+
+```bash
+cd ml_service
+python -m src.api
+```
+
+### 2) Seed demo listings
+In a separate terminal from the **repo root**:
+
+```bash
+cd server
+npm install
+npm run seed:demo
+```
+
+This clears existing listings owned by the system demo user (`system@gdrealty.com`) and reseeds fresh
+ML-anchored King County listings. It does **not** touch listings created by real users.
+
+### 3) Server
 ```bash
 cd server
 npm install
@@ -26,7 +46,7 @@ Optional environment variables:
 - `MONGO_URI=mongodb://...`
 - `CLIENT_ORIGIN=http://localhost:5173`
 
-### 2) Client
+### 4) Client
 ```bash
 cd client
 npm install
