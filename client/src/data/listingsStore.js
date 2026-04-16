@@ -3,10 +3,15 @@ import { parseJson } from '../utils/api.js'
 
 export const fetchListings = async () => {
   const res = await fetch('/api/listings', { credentials: 'include' })
-  if (!res.ok) {
-    throw new Error('Failed to load listings.')
-  }
   const data = await parseJson(res)
+  if (res.status === 503 && data?.dbConnected === false) {
+    const err = new Error(data?.message || 'Database not available.')
+    err.dbUnavailable = true
+    throw err
+  }
+  if (!res.ok) {
+    throw new Error(data?.message || 'Failed to load listings.')
+  }
   return data || []
 }
 

@@ -23,7 +23,11 @@ app.use(
 )
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'api' })
+  res.json({
+    status: 'ok',
+    service: 'api',
+    dbConnected: mongoose.connection.readyState === 1,
+  })
 })
 
 app.use('/api/auth', authRoutes)
@@ -50,12 +54,25 @@ const startServer = async () => {
 
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
     })
     console.log('MongoDB connected')
     await seedListings()
   } catch (error) {
     console.error('MongoDB connection error:', error.message)
+    console.error('Error code:', error.code || 'N/A')
+    if (error.reason) {
+      console.error('Reason:', error.reason)
+    }
+    if (error.message && error.message.includes('IP')) {
+      console.error('→ Fix: In Atlas go to Network Access, add your current IP (or 0.0.0.0/0 for dev). Wait 1–2 min and restart.')
+    }
+    if (error.message && (error.message.includes('auth') || error.message.includes('Authentication'))) {
+      console.error('→ Fix: Check MONGO_URI username/password. If password has special chars (@ # $ etc), URL-encode them.')
+    }
+    if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      console.error('→ Fix: Check internet and that MONGO_URI host matches your Atlas cluster (e.g. cluster0.xxxxx.mongodb.net).')
+    }
   }
 }
 

@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     avatarUrl: { type: String, default: '' },
     preferredBudget: { type: Number, default: null },
-    riskTolerance: { type: String, enum: ['low', 'medium', 'high', ''], default: '' },
+    riskTolerance: { type: String, enum: ['low', 'medium', 'high', '', null], default: '' },
   },
   { timestamps: true }
 )

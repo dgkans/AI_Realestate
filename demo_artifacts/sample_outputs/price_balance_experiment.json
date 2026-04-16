@@ -1,0 +1,63 @@
+{
+  "dataset_path": "/Users/gdm4mac/Desktop/csuf/macTransfer/CSUF_Courses/Spring26/CPSC597/Final_code/AI_Realestate/ml_service/data/kc_house_data.csv",
+  "feature_set": [
+    "bedrooms",
+    "bathrooms",
+    "sqft_living",
+    "sqft_lot",
+    "floors",
+    "zipcode",
+    "yr_built"
+  ],
+  "target": "price",
+  "random_state": 42,
+  "test_split": 0.2,
+  "results": [
+    {
+      "arm": "baseline_full_data",
+      "train_rows": 17290,
+      "test_rows": 4323,
+      "mae": 101955.67757004249,
+      "rmse": 210496.49553422455,
+      "r2": 0.7069074067644291,
+      "band_mae": {
+        "low": 54420.24455696364,
+        "mid": 71250.22274304455,
+        "high": 211324.62677737657,
+        "q1_price": 324950.0,
+        "q3_price": 655000.0
+      }
+    },
+    {
+      "arm": "balanced_train_p95",
+      "train_rows": 16432,
+      "test_rows": 4323,
+      "train_price_cap_p95": 1150000.0,
+      "mae": 115286.2031044845,
+      "rmse": 283649.60753785714,
+      "r2": 0.46779435367214584,
+      "band_mae": {
+        "low": 52997.30927324629,
+        "mid": 63093.582213062175,
+        "high": 282558.4766966605,
+        "q1_price": 324950.0,
+        "q3_price": 655000.0
+      }
+    },
+    {
+      "arm": "log_target_full_data",
+      "train_rows": 17290,
+      "test_rows": 4323,
+      "mae": 98575.17711877753,
+      "rmse": 201319.83184667455,
+      "r2": 0.7319053041323493,
+      "band_mae": {
+        "low": 47356.39711270078,
+        "mid": 67100.78481885287,
+        "high": 213192.1193028504,
+        "q1_price": 324950.0,
+        "q3_price": 655000.0
+      }
+    }
+  ]
+}

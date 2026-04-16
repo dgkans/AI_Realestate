@@ -1,4 +1,5 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import Listing from '../models/Listing.js'
 import User from '../models/User.js'
 import { requireAuth } from '../middleware/auth.js'
@@ -7,9 +8,16 @@ const router = express.Router()
 
 router.get('/', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        message: 'Database not available. Check MONGO_URI and Atlas IP whitelist.',
+        dbConnected: false,
+      })
+    }
     const listings = await Listing.find().sort({ createdAt: -1 })
     res.json(listings)
   } catch (error) {
+    console.error('Listings fetch error:', error.message)
     res.status(500).json({ message: 'Server error.' })
   }
 })

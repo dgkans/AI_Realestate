@@ -20,6 +20,7 @@ const defaultFilters = {
 export default function Listings() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
+  const [dbUnavailable, setDbUnavailable] = useState(false)
   const [listingsData, setListingsData] = useState(() => fallbackListings())
   const { currentUser } = useAuth()
 
@@ -43,6 +44,7 @@ export default function Listings() {
     let active = true
     const load = async () => {
       try {
+        setDbUnavailable(false)
         const data = await fetchListings()
         if (active) {
           setListingsData(data)
@@ -50,6 +52,7 @@ export default function Listings() {
       } catch (error) {
         if (active) {
           setListingsData(fallbackListings())
+          setDbUnavailable(!!error.dbUnavailable)
         }
       } finally {
         if (active) {
@@ -103,6 +106,11 @@ export default function Listings() {
 
   return (
     <PageContainer>
+      {dbUnavailable && (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Database not connected. Showing demo listings. To load real data, set MONGO_URI in server/.env and whitelist your IP in MongoDB Atlas → Network Access.
+        </div>
+      )}
       <div className="mb-6 flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-slate-100">Listings</h1>
         <p className="text-sm text-slate-300">

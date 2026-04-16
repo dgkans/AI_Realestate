@@ -116,3 +116,32 @@ npm run dev
 
 With all three services running (FastAPI, Node, and Vite), the **“Analyze with AI”** button on the listing details page will call `/api/ml/analyze` via the Node backend and display pricing insights from the ML model.
 
+## 7. Run the price-balance experiment (Point 2 feedback)
+
+This experiment compares three training approaches for handling right-skewed prices:
+
+- `baseline_full_data`
+- `balanced_train_p95` (upper-tail trim at train P95)
+- `log_target_full_data` (`log1p(price)` transform)
+
+### One-command runner
+
+From the repo root:
+
+```bash
+bash ml_service/run_balance_experiment.sh
+```
+
+### Direct Python command
+
+From `ml_service/` with venv active:
+
+```bash
+python -m src.balance_experiment
+```
+
+### Output artifacts
+
+- Metrics JSON: `demo_artifacts/sample_outputs/price_balance_experiment.json`
+- Comparison plot: `demo_artifacts/plots/price_balance_comparison.png`
+

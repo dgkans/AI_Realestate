@@ -88,6 +88,7 @@ router.post('/login', async (req, res) => {
       avatarUrl: user.avatarUrl,
     })
   } catch (error) {
+    console.error('Login error:', error.message)
     return res.status(500).json({ message: 'Server error.' })
   }
 })
