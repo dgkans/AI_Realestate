@@ -5,16 +5,32 @@ import Button from '../components/Button'
 import Card from '../components/Card'
 import { SkeletonBlock, SkeletonLine } from '../components/Skeleton'
 import mockListings from '../data/mockListings'
+import {
+  fetchSavedStatus,
+  saveListing as saveListingApi,
+  unsaveListing as unsaveListingApi,
+} from '../data/listingsStore.js'
 import { parseJson } from '../utils/api.js'
+import { useAuth } from '../context/AuthContext.jsx'
+
+function isMongoId(value) {
+  return /^[a-f\d]{24}$/i.test(String(value || ''))
+}
 
 export default function ListingDetails() {
   const { id } = useParams()
+  const { currentUser } = useAuth()
+  const listingMongoId = useMemo(() => (isMongoId(id) ? id : null), [id])
   const [loading, setLoading] = useState(true)
   const [remoteListing, setRemoteListing] = useState(null)
+  const [saved, setSaved] = useState(false)
+  const [saveBusy, setSaveBusy] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiResult, setAiResult] = useState(null)
   const [advisor, setAdvisor] = useState(null)
+  const [showAiDetails, setShowAiDetails] = useState(false)
+  const [showComparables, setShowComparables] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -37,6 +53,26 @@ export default function ListingDetails() {
     }
   }, [id])
 
+  useEffect(() => {
+    let active = true
+    const loadSaved = async () => {
+      if (!currentUser || !listingMongoId) {
+        if (active) setSaved(false)
+        return
+      }
+      try {
+        const { saved: isSaved } = await fetchSavedStatus(listingMongoId)
+        if (active) setSaved(isSaved)
+      } catch {
+        if (active) setSaved(false)
+      }
+    }
+    loadSaved()
+    return () => {
+      active = false
+    }
+  }, [currentUser, listingMongoId])
+
   const listing = useMemo(() => {
     if (remoteListing) return remoteListing
     return mockListings.find((item) => item.id === id)
@@ -48,6 +84,8 @@ export default function ListingDetails() {
     setAiError('')
     setAiResult(null)
     setAdvisor(null)
+    setShowAiDetails(false)
+    setShowComparables(false)
 
     const bedrooms = listing.beds ?? listing.bedrooms ?? 3
     const bathrooms = listing.baths ?? listing.bathrooms ?? 2
@@ -58,6 +96,13 @@ export default function ListingDetails() {
     const yrBuilt = listing.yr_built ?? listing.yrBuilt ?? 1995
     const listedPrice = listing.price ?? listing.listed_price ?? 800000
 
+    const preferredBudget =
+      currentUser?.preferredBudget != null && currentUser.preferredBudget > 0
+        ? Number(currentUser.preferredBudget)
+        : null
+
+    const riskTolerance = currentUser?.riskTolerance ? String(currentUser.riskTolerance) : null
+
     const payload = {
       bedrooms,
       bathrooms,
@@ -67,6 +112,7 @@ export default function ListingDetails() {
       zipcode,
       yr_built: yrBuilt,
       listed_price: listedPrice,
+      ...(preferredBudget != null ? { preferred_budget: preferredBudget } : {}),
     }
 
     try {
@@ -108,6 +154,8 @@ export default function ListingDetails() {
             listed_price: listedPrice,
             comps_avg_price: data.comps_avg_price,
             deviation_percent: data.deviation_pct,
+            ...(preferredBudget != null ? { preferred_budget: preferredBudget } : {}),
+            ...(riskTolerance ? { risk_tolerance: riskTolerance } : {}),
           }),
         })
         const advisorData = await parseJson(advisorRes)
@@ -121,6 +169,25 @@ export default function ListingDetails() {
       setAiError(error.message || 'AI analysis failed.')
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  const handleToggleSave = async () => {
+    if (!listingMongoId || !currentUser) return
+    setSaveBusy(true)
+    try {
+      if (saved) {
+        await unsaveListingApi(listingMongoId)
+        setSaved(false)
+      } else {
+        await saveListingApi(listingMongoId)
+        setSaved(true)
+      }
+      window.dispatchEvent(new Event('saved-listings-change'))
+    } catch (error) {
+      window.alert(error.message || 'Could not update saved listings.')
+    } finally {
+      setSaveBusy(false)
     }
   }
 
@@ -215,7 +282,24 @@ export default function ListingDetails() {
               </p>
               <p className="mt-2 text-sm text-slate-300">{listing.city}</p>
               <div className="mt-6 flex flex-col gap-3">
-                <Button>Save Listing</Button>
+                {!currentUser ? (
+                  <Button as={Link} to="/login" state={{ from: `/listing/${id}` }}>
+                    Save listing
+                  </Button>
+                ) : !listingMongoId ? (
+                  <Button type="button" disabled variant="outline" className="opacity-60 cursor-not-allowed">
+                    Save listing (catalog only)
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant={saved ? 'outline' : 'primary'}
+                    onClick={handleToggleSave}
+                    disabled={saveBusy}
+                  >
+                    {saveBusy ? 'Updating…' : saved ? 'Saved' : 'Save listing'}
+                  </Button>
+                )}
                 <Button variant="outline">Message Agent</Button>
                 <Button variant="outline" onClick={handleAnalyzeWithAi} disabled={aiLoading}>
                   {aiLoading ? 'Analyzing…' : 'Analyze with AI'}
@@ -227,178 +311,251 @@ export default function ListingDetails() {
                 </p>
               )}
               {aiResult && (
-                <div className="mt-4 space-y-2 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-sm text-slate-100">
-                  <p className="font-semibold">AI pricing insights</p>
-                  <p>
-                    <span className="text-slate-400">Listed price: </span>$
-                    {listing.price.toLocaleString()}
-                  </p>
-                  <p>
-                    <span className="text-slate-400">
-                      Model predicted price (Random Forest):{' '}
-                    </span>
-                    $
-                    {Math.round(aiResult.predicted_price).toLocaleString()}
-                  </p>
-                  <p>
-                    <span className="text-slate-400">Comps average: </span>$
-                    {Math.round(aiResult.comps_avg_price).toLocaleString()}
-                  </p>
-                  <p>
-                    <span className="text-slate-400">Deviation: </span>
-                    {(() => {
+                <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-sm text-slate-100">
+                  {(() => {
+                    const clamp01 = (n) => Math.max(0, Math.min(1, n))
+                    const confidenceRaw =
+                      typeof aiResult.confidence_score === 'number'
+                        ? clamp01(aiResult.confidence_score)
+                        : null
+                    const confidencePct =
+                      confidenceRaw == null ? null : Number((confidenceRaw * 100).toFixed(0))
+                    let confidenceLabel = null
+                    if (confidenceRaw != null) {
+                      confidenceLabel = confidenceRaw >= 0.75 ? 'High' : confidenceRaw < 0.5 ? 'Low' : 'Medium'
+                    }
+
+                    const deviationText = (() => {
                       const value = aiResult.deviation_pct
                       if (value > 200) return '>200%'
                       if (value < -200) return '<-200%'
                       return `${value.toFixed(1)}%`
-                    })()}
-                  </p>
-                  <p>
-                    <span className="text-slate-400">Pricing flag (vs model): </span>
-                    <span
-                      className={`uppercase tracking-wide font-semibold ${
-                        aiResult.pricing_flag === 'overpriced'
-                          ? 'text-rose-400'
-                          : aiResult.pricing_flag === 'underpriced'
-                          ? 'text-emerald-400'
-                          : 'text-amber-300'
-                      }`}
-                    >
-                      {aiResult.pricing_flag}
-                    </span>
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {(() => {
-                      const listed = listing.price
-                      const compsAvg = aiResult.comps_avg_price
-                      const compsDeltaPct =
-                        compsAvg > 0 ? ((listed - compsAvg) / compsAvg) * 100 : 0
+                    })()
 
-                      let compsPhrase = 'close to'
-                      if (compsDeltaPct > 5) compsPhrase = 'above'
-                      if (compsDeltaPct < -5) compsPhrase = 'below'
+                    const pricingFlag = aiResult.pricing_flag
+                    const flagLabel =
+                      pricingFlag === 'overpriced'
+                        ? 'Overpriced'
+                        : pricingFlag === 'underpriced'
+                        ? 'Underpriced'
+                        : 'Fair'
+                    const flagClasses =
+                      pricingFlag === 'overpriced'
+                        ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                        : pricingFlag === 'underpriced'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                        : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
 
-                      const compsSummary =
-                        compsAvg > 0 ? ` Comps average is ${compsPhrase} list price.` : ''
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
+                              AI pricing insights
+                            </p>
+                            <p className="mt-1 text-sm text-slate-300">
+                              Summary first, details on demand.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${flagClasses}`}>
+                              {flagLabel}
+                            </span>
+                            {confidenceRaw != null && (
+                              <span className="rounded-full border border-slate-700/60 bg-slate-800/40 px-3 py-1 text-xs font-semibold text-slate-200">
+                                Confidence: {confidenceLabel} ({confidencePct}%)
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                      if (aiResult.pricing_flag === 'overpriced') {
-                        return `Listed above the model estimate.${compsSummary}`
-                      }
-                      if (aiResult.pricing_flag === 'underpriced') {
-                        return `Listed below the model estimate.${compsSummary}`
-                      }
-                      return `Within expected range of the model estimate.${compsSummary}`
-                    })()}
-                  </p>
-                  <div
-                    className={`mt-3 rounded-2xl border p-3 text-xs text-slate-100 ${
-                      aiResult.pricing_flag === 'overpriced'
-                        ? 'border-rose-500/50 bg-rose-950/40'
-                        : aiResult.pricing_flag === 'underpriced'
-                        ? 'border-emerald-500/40 bg-emerald-950/30'
-                        : 'border-sky-500/30 bg-sky-950/30'
-                    }`}
-                  >
-                    <p className="font-semibold text-slate-50">AI Insight</p>
-                    <p className="mt-1 text-slate-300">
-                      {(() => {
-                        const listed = listing.price
-                        const d = aiResult.deviation_pct
-                        const predictedRaw = aiResult.predicted_price
-                        const compsAvgRaw = aiResult.comps_avg_price
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {[
+                            { label: 'Listed', value: `$${listing.price.toLocaleString()}` },
+                            {
+                              label: 'Predicted (RF)',
+                              value: `$${Math.round(aiResult.predicted_price).toLocaleString()}`,
+                            },
+                            {
+                              label: 'Comps avg',
+                              value: `$${Math.round(aiResult.comps_avg_price).toLocaleString()}`,
+                            },
+                            { label: 'Deviation', value: deviationText },
+                          ].map((item) => (
+                            <div
+                              key={item.label}
+                              className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-3"
+                            >
+                              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-600">
+                                {item.label}
+                              </p>
+                              <p className="mt-1 text-lg font-semibold text-slate-50">
+                                {item.value}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
 
-                        const predicted = Math.round(predictedRaw).toLocaleString()
-                        const compsAvg = Math.round(compsAvgRaw).toLocaleString()
+                        {aiResult.budget_message && (
+                          <div className="rounded-2xl border border-sky-500/30 bg-sky-950/20 p-3 text-xs text-slate-100">
+                            <p className="font-semibold text-sky-200">Budget fit</p>
+                            <p className="mt-1 text-slate-300">{aiResult.budget_message}</p>
+                          </div>
+                        )}
 
-                        const compsDeltaPct =
-                          compsAvgRaw > 0 ? ((listed - compsAvgRaw) / compsAvgRaw) * 100 : 0
-                        const compsDeltaAbs = Math.abs(compsDeltaPct)
+                        {currentUser &&
+                          (currentUser.preferredBudget == null || currentUser.preferredBudget <= 0) && (
+                            <p className="text-xs text-slate-500">
+                              Tip: set a preferred budget in Profile to personalize the analysis.
+                            </p>
+                          )}
 
-                        let compsRelation = 'close to'
-                        if (compsDeltaPct > 5) compsRelation = 'above'
-                        if (compsDeltaPct < -5) compsRelation = 'below'
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAiDetails((v) => !v)}
+                            className="rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900/60"
+                          >
+                            {showAiDetails ? 'Hide details' : 'Show details'}
+                          </button>
+                          {Array.isArray(aiResult.comparables) && aiResult.comparables.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowComparables((v) => !v)}
+                              className="rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900/60"
+                            >
+                              {showComparables ? 'Hide comparables' : 'Show comparables'}
+                            </button>
+                          )}
+                        </div>
 
-                        const compsSentence =
-                          compsAvgRaw > 0
-                            ? ` Comparable average is ~$${compsAvg}, and this listing is ${compsRelation} that level${
-                                compsDeltaAbs > 0 ? ` (~${compsDeltaAbs.toFixed(1)}%)` : ''
-                              }.`
-                            : ''
+                        {showAiDetails && (
+                          <div className="rounded-2xl border border-slate-800/80 bg-slate-950/20 p-3 text-xs text-slate-100">
+                            <p className="font-semibold text-slate-50">AI Insight</p>
+                            <p className="mt-1 text-slate-300">
+                              {(() => {
+                                const listed = listing.price
+                                const d = aiResult.deviation_pct
+                                const predictedRaw = aiResult.predicted_price
+                                const compsAvgRaw = aiResult.comps_avg_price
 
-                        if (d > 10) {
-                          return `Model signals a premium: the asking price is ~${d.toFixed(
-                            1
-                          )}% above the estimated fair value (~$${predicted}).${compsSentence} Buyers may want to negotiate or confirm unique features justify the premium.`
-                        }
-                        if (d < -5) {
-                          return `Model signals a discount: the asking price is ~${Math.abs(
-                            d
-                          ).toFixed(1)}% below the estimated fair value (~$${predicted}).${compsSentence} This can be a value opportunity, but it can also reflect condition or urgency—worth a closer look.`
-                        }
-                        return `Model signals fair value: the asking price is close to the estimate (~$${predicted}).${compsSentence} Overall, the listing aligns with typical pricing for similar homes.`
-                      })()}
-                    </p>
-                  </div>
-                  {Array.isArray(aiResult.comparables) && aiResult.comparables.length > 0 && (
-                    <div className="mt-4 space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
-                        Comparable Properties
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Comparable properties retrieved using K-Nearest Neighbors similarity.
-                      </p>
-                      {aiResult.comparables.slice(0, 5).map((comp, idx) => (
-                        <p key={idx} className="text-xs text-slate-200">
-                          ${Math.round(comp.price).toLocaleString()} | {comp.bedrooms} bed |{' '}
-                          {comp.bathrooms} bath | {comp.sqft_living} sqft | ZIP {comp.zipcode}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  {advisor && (
-                    <div className="mt-4 rounded-2xl border border-indigo-500/50 bg-indigo-950/40 p-3 text-xs text-slate-100">
-                      <p className="font-semibold text-slate-50">Investment Advisor</p>
-                      <p className="mt-1 text-slate-300">
-                        <span className="text-slate-400">Recommendation: </span>
-                        <span className="font-semibold text-indigo-300">
-                          {advisor.recommendation}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-slate-300">
-                        <span className="text-slate-400">Risk level: </span>
-                        <span
-                          className={`font-semibold ${
-                            advisor.risk === 'High'
-                              ? 'text-rose-400'
-                              : advisor.risk === 'Low'
-                              ? 'text-emerald-400'
-                              : 'text-amber-300'
-                          }`}
-                        >
-                          {advisor.risk}
-                        </span>
-                      </p>
-                      <ul className="mt-2 space-y-1 text-[11px] text-slate-300">
-                        <li>
-                          <span className="text-slate-400">Suggested action: </span>
-                          {advisor.recommendation === 'NEGOTIATE' &&
-                            'Target a lower offer and use the model and comps as support.'}
-                          {advisor.recommendation === 'FAIR VALUE' &&
-                            'Proceed at or near list price, with standard negotiation room.'}
-                          {advisor.recommendation === 'POTENTIAL OPPORTUNITY' &&
-                            'Consider moving quickly if due diligence (inspection, financing, etc.) checks out.'}
-                        </li>
-                        <li>
-                          <span className="text-slate-400">Rationale: </span>
-                          {advisor.message}
-                        </li>
-                        <li>
-                          <span className="text-slate-400">Next step: </span>
-                          {'Review inspection reports and your budget before making a final decision.'}
-                        </li>
-                      </ul>
-                    </div>
-                  )}
+                                const predicted = Math.round(predictedRaw).toLocaleString()
+                                const compsAvg = Math.round(compsAvgRaw).toLocaleString()
+
+                                const compsDeltaPct =
+                                  compsAvgRaw > 0 ? ((listed - compsAvgRaw) / compsAvgRaw) * 100 : 0
+                                const compsDeltaAbs = Math.abs(compsDeltaPct)
+
+                                let compsRelation = 'close to'
+                                if (compsDeltaPct > 5) compsRelation = 'above'
+                                if (compsDeltaPct < -5) compsRelation = 'below'
+
+                                const compsSentence =
+                                  compsAvgRaw > 0
+                                    ? ` Comparable average is ~$${compsAvg}, and this listing is ${compsRelation} that level${
+                                        compsDeltaAbs > 0 ? ` (~${compsDeltaAbs.toFixed(1)}%)` : ''
+                                      }.`
+                                    : ''
+
+                                if (d > 10) {
+                                  return `Model signals a premium: the asking price is ~${d.toFixed(
+                                    1
+                                  )}% above the estimated fair value (~$${predicted}).${compsSentence} Buyers may want to negotiate or confirm unique features justify the premium.`
+                                }
+                                if (d < -5) {
+                                  return `Model signals a discount: the asking price is ~${Math.abs(
+                                    d
+                                  ).toFixed(1)}% below the estimated fair value (~$${predicted}).${compsSentence} This can be a value opportunity, but it can also reflect condition or urgency—worth a closer look.`
+                                }
+                                return `Model signals fair value: the asking price is close to the estimate (~$${predicted}).${compsSentence} Overall, the listing aligns with typical pricing for similar homes.`
+                              })()}
+                            </p>
+                          </div>
+                        )}
+
+                        {showComparables &&
+                          Array.isArray(aiResult.comparables) &&
+                          aiResult.comparables.length > 0 && (
+                            <div className="rounded-2xl border border-slate-800/80 bg-slate-950/20 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
+                                Comparable properties
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Retrieved using K-Nearest Neighbors similarity.
+                              </p>
+                              <div className="mt-3 overflow-hidden rounded-xl border border-slate-800/70">
+                                <div className="grid grid-cols-[1fr,0.8fr,0.8fr] bg-slate-950/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                  <span>Price</span>
+                                  <span>Beds/Baths</span>
+                                  <span>Sqft/ZIP</span>
+                                </div>
+                                <div className="divide-y divide-slate-800/70">
+                                  {aiResult.comparables.slice(0, 5).map((comp, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="grid grid-cols-[1fr,0.8fr,0.8fr] px-3 py-2 text-xs text-slate-200"
+                                    >
+                                      <span className="font-semibold">
+                                        ${Math.round(comp.price).toLocaleString()}
+                                      </span>
+                                      <span>
+                                        {comp.bedrooms} / {comp.bathrooms}
+                                      </span>
+                                      <span>
+                                        {comp.sqft_living} | {comp.zipcode}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                        {advisor && (
+                          <div className="rounded-2xl border border-indigo-500/40 bg-indigo-950/25 p-3 text-xs text-slate-100">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-50">Investment Advisor</p>
+                                <p className="mt-1 text-slate-300">
+                                  <span className="text-slate-400">Recommendation: </span>
+                                  <span className="font-semibold text-indigo-300">
+                                    {advisor.recommendation}
+                                  </span>
+                                </p>
+                              </div>
+                              <span
+                                className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                                  advisor.risk === 'High'
+                                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                    : advisor.risk === 'Low'
+                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                    : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                                }`}
+                              >
+                                Risk: {advisor.risk}
+                              </span>
+                            </div>
+                            <div className="mt-2 space-y-2 text-[11px] text-slate-300">
+                              <p>
+                                <span className="text-slate-400">Why: </span>
+                                {advisor.message}
+                              </p>
+                              {advisor.budget_note && (
+                                <p>
+                                  <span className="text-slate-400">Budget: </span>
+                                  {advisor.budget_note}
+                                </p>
+                              )}
+                              <p>
+                                <span className="text-slate-400">Next step: </span>
+                                Review inspection reports and your budget before making a final decision.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </Card>

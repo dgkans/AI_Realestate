@@ -27,6 +27,7 @@ class ListingInput(BaseModel):
     zipcode: int
     yr_built: int
     listed_price: Optional[float] = None
+    preferred_budget: Optional[float] = None
 
 
 def load_artifacts():
@@ -140,6 +141,7 @@ def analyze(payload: ListingInput):
         X_scaled = scaler_model.transform(X)
         distances, indices = knn_model.kneighbors(X_scaled)
         idxs = indices[0]
+        dists = distances[0]
         comp_prices = [float(feature_df.iloc[int(i)]["price"]) for i in idxs]
         comps_avg_price = float(np.mean(comp_prices)) if comp_prices else pred
 
@@ -157,13 +159,43 @@ def analyze(payload: ListingInput):
         else:
             pricing_flag = "underpriced"
 
+        # Simple confidence score based on average neighbor distance.
+        # Smaller distances → higher confidence, mapped into [0, 1].
+        avg_dist = float(np.mean(dists)) if len(dists) else 0.0
+        confidence_score = float(1.0 / (1.0 + avg_dist)) if avg_dist > 0 else 1.0
+
         response = {
             "predicted_price": pred,
             "comps_avg_price": comps_avg_price,
             "listed_price": float(listed_price),
             "deviation_pct": deviation_pct,
             "pricing_flag": pricing_flag,
+            "confidence_score": confidence_score,
         }
+
+        pb = payload.preferred_budget
+        if pb is not None and pb > 0:
+            pb_f = float(pb)
+            lp_f = float(listed_price)
+            delta = lp_f - pb_f
+            over_pct = (delta / pb_f * 100.0) if pb_f else 0.0
+            if lp_f <= pb_f:
+                response["budget_status"] = "within"
+                response["preferred_budget"] = pb_f
+                response["listed_vs_budget_amount"] = delta
+                response["listed_vs_budget_pct"] = over_pct
+                response["budget_message"] = (
+                    f"This list price is at or below your profile budget (${pb_f:,.0f})."
+                )
+            else:
+                response["budget_status"] = "over"
+                response["preferred_budget"] = pb_f
+                response["listed_vs_budget_amount"] = delta
+                response["listed_vs_budget_pct"] = over_pct
+                response["budget_message"] = (
+                    f"This list price is ${delta:,.0f} (~{over_pct:.1f}%) above your "
+                    f"profile budget (${pb_f:,.0f})."
+                )
 
         if DEBUG_COMPS:
           response["debug"] = {

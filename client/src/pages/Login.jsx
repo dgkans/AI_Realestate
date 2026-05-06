@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import Button from '../components/Button'
 import Input from '../components/Input'
@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const [formValues, setFormValues] = useState({
     email: '',
@@ -25,7 +26,9 @@ export default function Login() {
     try {
       await login({ email: formValues.email, password: formValues.password })
       setSuccess('Login successful. Redirecting...')
-      setTimeout(() => navigate('/profile'), 600)
+      const redirectTo =
+        typeof location.state?.from === 'string' ? location.state.from : '/profile'
+      setTimeout(() => navigate(redirectTo, { replace: true }), 600)
     } catch (err) {
       setError(err.message)
     } finally {

@@ -6,7 +6,7 @@ import ListingGrid from '../components/ListingGrid'
 import EmptyState from '../components/EmptyState'
 import { useEffect, useState } from 'react'
 import mockListings from '../data/mockListings'
-import { fetchMyListings } from '../data/listingsStore'
+import { fetchMyListings, fetchSavedListings } from '../data/listingsStore'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const mockUser = {
@@ -27,6 +27,7 @@ export default function Profile() {
   const { currentUser } = useAuth()
   const isLoggedIn = Boolean(currentUser)
   const [storedListings, setStoredListings] = useState([])
+  const [savedListings, setSavedListings] = useState([])
   const listingsToShow = storedListings.slice(0, 3)
 
   useEffect(() => {
@@ -50,6 +51,31 @@ export default function Profile() {
       active = false
       window.removeEventListener('storage', syncListings)
       window.removeEventListener('listings-change', syncListings)
+    }
+  }, [currentUser])
+
+  useEffect(() => {
+    let active = true
+    const loadSaved = async () => {
+      if (!currentUser) {
+        if (active) setSavedListings([])
+        return
+      }
+      try {
+        const data = await fetchSavedListings()
+        if (active) setSavedListings(data)
+      } catch {
+        if (active) setSavedListings([])
+      }
+    }
+    loadSaved()
+    const onSavedChange = () => {
+      loadSaved()
+    }
+    window.addEventListener('saved-listings-change', onSavedChange)
+    return () => {
+      active = false
+      window.removeEventListener('saved-listings-change', onSavedChange)
     }
   }, [currentUser])
 
@@ -129,12 +155,36 @@ export default function Profile() {
             </div>
           </Card>
 
+          <Card className="p-6" id="saved">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100">Saved listings</h3>
+                <p className="text-sm text-slate-300">
+                  Homes you bookmark from listing details appear here.
+                </p>
+              </div>
+              <Button as={Link} to="/list" variant="outline" className="shrink-0">
+                Browse listings
+              </Button>
+            </div>
+            <div className="mt-6">
+              {savedListings.length ? (
+                <ListingGrid listings={savedListings} currentUser={currentUser} />
+              ) : (
+                <EmptyState
+                  title="No saved listings yet"
+                  description="Open a property and tap Save listing to build your shortlist."
+                />
+              )}
+            </div>
+          </Card>
+
           <Card className="p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <h3 className="text-lg font-semibold text-slate-100">My Listings</h3>
                 <p className="text-sm text-slate-300">
-                  Manage your active posts and saved listings.
+                  Properties you have posted as an agent or seller.
                 </p>
               </div>
               <Button as={Link} to="/add" variant="primary">

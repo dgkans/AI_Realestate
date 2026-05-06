@@ -64,4 +64,46 @@ export const deleteListing = async (id) => {
   return data
 }
 
+export const fetchSavedListings = async () => {
+  const res = await fetch('/api/saved', { credentials: 'include' })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    throw new Error(data?.message || 'Failed to load saved listings.')
+  }
+  return data || []
+}
+
+export const fetchSavedStatus = async (listingId) => {
+  const res = await fetch(`/api/saved/check/${listingId}`, { credentials: 'include' })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return { saved: false }
+  }
+  return { saved: Boolean(data?.saved) }
+}
+
+export const saveListing = async (listingId) => {
+  const res = await fetch(`/api/saved/${listingId}`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    throw new Error(data?.message || 'Could not save listing.')
+  }
+  return data
+}
+
+export const unsaveListing = async (listingId) => {
+  const res = await fetch(`/api/saved/${listingId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    throw new Error(data?.message || 'Could not remove saved listing.')
+  }
+  return data
+}
+
 export const fallbackListings = () => mockListings

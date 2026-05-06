@@ -47,6 +47,8 @@ router.post('/advisor', (req, res) => {
     listed_price: listedPrice,
     comps_avg_price: compsAvgPrice,
     deviation_percent: deviationPercent,
+    preferred_budget: preferredBudget,
+    risk_tolerance: riskTolerance,
   } = req.body || {}
 
   if (
@@ -67,27 +69,47 @@ router.post('/advisor', (req, res) => {
   const compsRelation =
     compsDeltaPct > 5 ? 'above' : compsDeltaPct < -5 ? 'below' : 'close to'
 
-  if (deviationPercent > 15) {
+  const tol = typeof riskTolerance === 'string' ? riskTolerance.toLowerCase() : ''
+  // Interpret the same model deviation differently depending on user's risk tolerance.
+  // These thresholds are intentionally simple + explainable for the project demo.
+  const overThreshold = tol === 'low' ? 10 : tol === 'high' ? 20 : 15
+  const underThreshold = tol === 'low' ? -15 : tol === 'high' ? -5 : -10
+
+  if (deviationPercent > overThreshold) {
     recommendation = 'NEGOTIATE'
     risk = 'High'
     message =
-      `This property appears significantly overpriced relative to the estimated market value. Compared to comparable properties, the list price is ${compsRelation} the comps average. Buyers may want to negotiate closer to the predicted fair value before proceeding.`
-  } else if (deviationPercent < -10) {
+      `This property appears overpriced relative to the estimated market value using your "${tol || 'medium'}" risk tolerance. Compared to comparable properties, the list price is ${compsRelation} the comps average. Buyers may want to negotiate closer to the predicted fair value before proceeding.`
+  } else if (deviationPercent < underThreshold) {
     recommendation = 'POTENTIAL OPPORTUNITY'
     risk = 'Low'
     message =
-      `The property appears underpriced relative to the predicted market value. Compared to comparable properties, the list price is ${compsRelation} the comps average. This may represent a potential investment opportunity.`
+      `This property appears underpriced relative to the estimated market value using your "${tol || 'medium'}" risk tolerance. Compared to comparable properties, the list price is ${compsRelation} the comps average. This may represent a potential investment opportunity.`
   } else {
     recommendation = 'FAIR VALUE'
     risk = 'Moderate'
     message =
-      `The listing price is aligned with the model estimate. Compared to comparable properties, the list price is ${compsRelation} the comps average.`
+      `The listing price is aligned with the model estimate using your "${tol || 'medium'}" risk tolerance. Compared to comparable properties, the list price is ${compsRelation} the comps average.`
+  }
+
+  let budget_note = null
+  if (typeof preferredBudget === 'number' && preferredBudget > 0) {
+    const fmt = (n) => Math.round(n).toLocaleString()
+    if (listedPrice <= preferredBudget) {
+      const headroom = preferredBudget - listedPrice
+      budget_note = `Your profile budget is $${fmt(preferredBudget)}. This listing is within budget with about $${fmt(headroom)} of headroom at list price.`
+    } else {
+      const over = listedPrice - preferredBudget
+      const overPct = (over / preferredBudget) * 100
+      budget_note = `Your profile budget is $${fmt(preferredBudget)}; the list price is $${fmt(over)} over (~${overPct.toFixed(1)}%).`
+    }
   }
 
   return res.json({
     recommendation,
     risk,
     message,
+    budget_note,
   })
 })
 

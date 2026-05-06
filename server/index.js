@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import cookieParser from 'cookie-parser'
 import authRoutes from './routes/auth.js'
 import listingsRoutes from './routes/listings.js'
+import savedRoutes from './routes/saved.js'
 import mlRoutes from './routes/ml.js'
 import { seedListings } from './seed/seedListings.js'
 
@@ -32,6 +33,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/listings', listingsRoutes)
+app.use('/api/saved', savedRoutes)
 app.use('/api/ml', mlRoutes)
 
 app.use((err, req, res, next) => {
