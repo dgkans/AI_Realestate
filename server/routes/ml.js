@@ -3,19 +3,28 @@ import axios from 'axios'
 
 const router = express.Router()
 
-const ML_BASE_URL = process.env.ML_BASE_URL || 'http://127.0.0.1:8000'
+// Strip any trailing slash to avoid double-slash URLs when joining with paths.
+const ML_BASE_URL = (process.env.ML_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+
+// Render free Web Services sleep after 15 min idle and need ~30-50s to wake
+// up. The default 4s timeout is fine locally but kills the first request in
+// production. 60s gives the ML service plenty of room to cold-start before
+// we surface a real 503 to the user.
+const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000)
 
 const forwardToMl = async (path, req, res) => {
   try {
     const url = `${ML_BASE_URL}${path}`
     const response = await axios.post(url, req.body, {
-      timeout: 4000,
+      timeout: ML_TIMEOUT_MS,
     })
     return res.status(response.status).json(response.data)
   } catch (error) {
     const code = error.code || error.message
-    if (code === 'ECONNREFUSED' || code === 'ECONNABORTED') {
-      return res.status(503).json({ message: 'ML service unavailable.' })
+    if (code === 'ECONNREFUSED' || code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+      return res
+        .status(503)
+        .json({ message: 'ML service is waking up. Please try again in a few seconds.' })
     }
     const status = error.response?.status || 500
     const message =
