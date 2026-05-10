@@ -1,0 +1,58 @@
+# Render Blueprint
+# Deploys two free Web Services from this monorepo:
+#   1) ai-realestate-api  -> Node/Express  (server/)
+#   2) ai-realestate-ml   -> Python/FastAPI (ml_service/)
+#
+# After importing this Blueprint, set the marked env vars in the Render
+# dashboard (sync: false). The ML service is trained at build time so we
+# never commit the .joblib artifacts to git.
+#
+# Notes
+# - Free Web Services sleep after 15 min of inactivity (~50s cold start).
+#   Add a free https://cron-job.org job pinging /health every 14 min to
+#   keep them warm.
+# - Free plan = 512 MB RAM. The Random Forest is intentionally tuned in
+#   ml_service/src/train.py (n_estimators=50, max_depth=15, compress=3) to
+#   stay well below that limit (~30-50 MB resident).
+
+services:
+  - type: web
+    name: ai-realestate-api
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: ML_BASE_URL
+        sync: false
+
+  - type: web
+    name: ai-realestate-ml
+    env: python
+    plan: free
+    rootDir: ml_service
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -m src.train
+    startCommand: python -m uvicorn src.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: RELOAD
+        value: "false"

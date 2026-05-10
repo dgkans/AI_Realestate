@@ -211,5 +211,8 @@ def analyze(payload: ListingInput):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("src.api:app", host="127.0.0.1", port=8000, reload=True)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    reload_flag = os.environ.get("RELOAD", "true").lower() == "true"
+    uvicorn.run("src.api:app", host=host, port=port, reload=reload_flag)
 

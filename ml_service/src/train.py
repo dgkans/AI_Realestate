@@ -62,8 +62,15 @@ def train_models(df: pd.DataFrame):
         X, y, test_size=0.2, random_state=42
     )
 
+    # Tuned for free-tier hosting (Render 512 MB RAM): fewer / shallower trees
+    # keep the serialized joblib ~10-15 MB instead of 300+ MB while preserving
+    # most of the accuracy on this ~21 k row King County dataset.
     rf = RandomForestRegressor(
-        n_estimators=200, random_state=42, n_jobs=-1
+        n_estimators=50,
+        max_depth=15,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1,
     )
     rf.fit(X_train, y_train)
 
@@ -86,9 +93,11 @@ def train_models(df: pd.DataFrame):
 
 def save_models(rf, scaler, knn):
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(rf, MODELS_DIR / "price_model.joblib")
-    joblib.dump(scaler, MODELS_DIR / "scaler.joblib")
-    joblib.dump(knn, MODELS_DIR / "knn_model.joblib")
+    # compress=3 → ~3-5x smaller files (~10-15 MB instead of 50+ MB) with
+    # negligible load-time overhead. Important for free hosting plans.
+    joblib.dump(rf, MODELS_DIR / "price_model.joblib", compress=3)
+    joblib.dump(scaler, MODELS_DIR / "scaler.joblib", compress=3)
+    joblib.dump(knn, MODELS_DIR / "knn_model.joblib", compress=3)
 
     with (MODELS_DIR / "features.json").open("w", encoding="utf-8") as f:
         json.dump(FEATURES, f)

@@ -10,7 +10,7 @@ import {
   saveListing as saveListingApi,
   unsaveListing as unsaveListingApi,
 } from '../data/listingsStore.js'
-import { parseJson } from '../utils/api.js'
+import { apiFetch, parseJson } from '../utils/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 function isMongoId(value) {
@@ -36,7 +36,7 @@ export default function ListingDetails() {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch(`/api/listings/${id}`)
+        const res = await apiFetch(`/api/listings/${id}`, { credentials: 'omit' })
         if (!res.ok) {
           if (active) setRemoteListing(null)
           return
@@ -116,7 +116,7 @@ export default function ListingDetails() {
     }
 
     try {
-      const res = await fetch('/api/ml/analyze', {
+      const res = await apiFetch('/api/ml/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -129,7 +129,7 @@ export default function ListingDetails() {
       // Fetch comparable properties separately and merge into result
       let comparables = []
       try {
-        const compsRes = await fetch('/api/ml/comparables', {
+        const compsRes = await apiFetch('/api/ml/comparables', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -146,7 +146,7 @@ export default function ListingDetails() {
 
       // Call investment advisor endpoint with the aggregated analysis values
       try {
-        const advisorRes = await fetch('/api/ml/advisor', {
+        const advisorRes = await apiFetch('/api/ml/advisor', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

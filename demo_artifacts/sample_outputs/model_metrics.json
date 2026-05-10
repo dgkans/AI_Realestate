@@ -1,6 +1,14 @@
 {
-  "mae": 48616.05265849229,
-  "rmse": 110933.4212133202,
-  "r2": 0.9086913771319022,
-  "n_samples": 21613
+  "mae": 107935.29058830012,
+  "rmse": 214346.26659991886,
+  "n_samples": 21613,
+  "features": [
+    "bedrooms",
+    "bathrooms",
+    "sqft_living",
+    "sqft_lot",
+    "floors",
+    "zipcode",
+    "yr_built"
+  ]
 }

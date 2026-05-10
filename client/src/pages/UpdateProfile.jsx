@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import Input from '../components/Input'
 import { useAuth } from '../context/AuthContext.jsx'
-import { parseJson } from '../utils/api.js'
+import { apiFetch, parseJson } from '../utils/api.js'
 
 export default function UpdateProfile() {
   const { currentUser, refreshMe } = useAuth()
@@ -29,10 +29,9 @@ export default function UpdateProfile() {
     setPrefsMessage(null)
     setPrefsSaving(true)
     try {
-      const res = await fetch('/api/auth/profile', {
+      const res = await apiFetch('/api/auth/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           preferredBudget: preferredBudget === '' ? null : Number(preferredBudget),
           riskTolerance: riskTolerance || '',

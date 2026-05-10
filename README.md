@@ -254,6 +254,62 @@ A surface label (Low / Moderate / High) is shown alongside the percentage in the
 
 ---
 
+## Deployment (Free Tier)
+
+The app is designed to run end-to-end on free hosting tiers:
+
+| Layer | Vendor | Plan |
+| --- | --- | --- |
+| Frontend (Vite SPA) | **Vercel** | Hobby (free) |
+| Backend (Express) | **Render** Web Service | Free |
+| ML service (FastAPI) | **Render** Web Service | Free |
+| Database | **MongoDB Atlas** | M0 (free) |
+| Keep-alive ping | **cron-job.org** | Free |
+
+The Random Forest in `ml_service/src/train.py` is intentionally tuned (`n_estimators=50`, `max_depth=15`, `joblib.dump(..., compress=3)`) so the serialized model stays around **4–5 MB** and the running service comfortably fits in the 512 MB Render free-tier RAM limit. Models are not committed to git — Render runs `python -m src.train` at build time and regenerates them from `ml_service/data/kc_house_data.csv`.
+
+### Step 1 — MongoDB Atlas
+1. In **Network Access**, add `0.0.0.0/0` (or Render's documented egress range).
+2. Grab the connection string for your DB user and have it ready.
+
+### Step 2 — Render (backend + ML)
+The repo ships with a `render.yaml` Blueprint at the root.
+
+1. Push the repo to GitHub (already done).
+2. In Render → **New + → Blueprint** → connect this repo → apply.
+3. Render will create two services: `ai-realestate-api` and `ai-realestate-ml`.
+4. On the **ML service**, no extra env vars are required.
+5. On the **API service**, fill in (Dashboard → Environment):
+   - `MONGO_URI` → Atlas connection string (with the real password)
+   - `JWT_SECRET` → any long random string
+   - `ML_BASE_URL` → `https://ai-realestate-ml.onrender.com` (the URL of the ML service shown in Render)
+   - `CLIENT_ORIGIN` → leave blank for now; we'll fill it in after Vercel
+6. Note both Render URLs (e.g. `https://ai-realestate-api.onrender.com`, `https://ai-realestate-ml.onrender.com`).
+
+### Step 3 — Vercel (frontend)
+1. In Vercel → **Add New → Project** → import this GitHub repo.
+2. Set **Root Directory** to `client/`.
+3. Framework preset: **Vite** (auto-detected). Build command and output dir come from `client/vercel.json`.
+4. Add **Environment Variable**:
+   - `VITE_API_BASE_URL` → `https://ai-realestate-api.onrender.com` (your Render API URL, no trailing slash)
+5. Deploy. Vercel gives you `https://<project>.vercel.app`.
+
+### Step 4 — Finish wiring CORS
+Back in Render, set `CLIENT_ORIGIN` on the API service to your Vercel URL (you can pass multiple comma-separated origins, e.g. `https://<project>.vercel.app,https://<project>-git-main-<user>.vercel.app`). Save → Render redeploys.
+
+### Step 5 — Keep the free services warm (optional)
+Render free services sleep after 15 min of inactivity (~50 s cold start). To avoid this on demo day:
+
+1. Sign up at <https://cron-job.org> (free).
+2. Add two jobs, every 14 minutes:
+   - `GET https://ai-realestate-api.onrender.com/health`
+   - `GET https://ai-realestate-ml.onrender.com/health`
+
+### Local dev still works the same
+When `VITE_API_BASE_URL` is unset (typical for `npm run dev`), the client falls back to relative `/api/...` URLs and the Vite proxy in `client/vite.config.js` forwards them to `http://localhost:5050`. No deployment-specific code paths need to run locally.
+
+---
+
 ## Future Work
 
 - Replace the rule-based advisor with an **LLM-powered explanation layer** that justifies recommendations in natural language.

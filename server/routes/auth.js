@@ -9,11 +9,15 @@ const createToken = (userId) => {
   return jwt.sign({ sub: userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
 }
 
+const isProd = process.env.NODE_ENV === 'production'
+
 const setAuthCookie = (res, token) => {
   res.cookie('token', token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Cross-site cookies (Vercel client ↔ Render API) require SameSite=None
+    // and Secure. Both Render and Vercel serve over HTTPS, so this is safe.
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   })
 }
@@ -94,7 +98,13 @@ router.post('/login', async (req, res) => {
 })
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('token')
+  // clearCookie must mirror the attributes used in setAuthCookie or browsers
+  // will refuse to clear the cookie cross-site.
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+  })
   res.json({ message: 'Logged out.' })
 })
 

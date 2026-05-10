@@ -1,8 +1,8 @@
 import mockListings from './mockListings'
-import { parseJson } from '../utils/api.js'
+import { apiFetch, parseJson } from '../utils/api.js'
 
 export const fetchListings = async () => {
-  const res = await fetch('/api/listings', { credentials: 'include' })
+  const res = await apiFetch('/api/listings')
   const data = await parseJson(res)
   if (res.status === 503 && data?.dbConnected === false) {
     const err = new Error(data?.message || 'Database not available.')
@@ -16,7 +16,7 @@ export const fetchListings = async () => {
 }
 
 export const fetchMyListings = async () => {
-  const res = await fetch('/api/listings/mine', { credentials: 'include' })
+  const res = await apiFetch('/api/listings/mine')
   if (!res.ok) {
     throw new Error('Failed to load your listings.')
   }
@@ -25,10 +25,9 @@ export const fetchMyListings = async () => {
 }
 
 export const createListing = async (payload) => {
-  const res = await fetch('/api/listings', {
+  const res = await apiFetch('/api/listings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
   const data = await parseJson(res)
@@ -39,10 +38,9 @@ export const createListing = async (payload) => {
 }
 
 export const updateListing = async (id, payload) => {
-  const res = await fetch(`/api/listings/${id}`, {
+  const res = await apiFetch(`/api/listings/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
   const data = await parseJson(res)
@@ -53,9 +51,8 @@ export const updateListing = async (id, payload) => {
 }
 
 export const deleteListing = async (id) => {
-  const res = await fetch(`/api/listings/${id}`, {
+  const res = await apiFetch(`/api/listings/${id}`, {
     method: 'DELETE',
-    credentials: 'include',
   })
   const data = await parseJson(res)
   if (!res.ok) {
@@ -65,7 +62,7 @@ export const deleteListing = async (id) => {
 }
 
 export const fetchSavedListings = async () => {
-  const res = await fetch('/api/saved', { credentials: 'include' })
+  const res = await apiFetch('/api/saved')
   const data = await parseJson(res)
   if (!res.ok) {
     throw new Error(data?.message || 'Failed to load saved listings.')
@@ -74,7 +71,7 @@ export const fetchSavedListings = async () => {
 }
 
 export const fetchSavedStatus = async (listingId) => {
-  const res = await fetch(`/api/saved/check/${listingId}`, { credentials: 'include' })
+  const res = await apiFetch(`/api/saved/check/${listingId}`)
   const data = await parseJson(res)
   if (!res.ok) {
     return { saved: false }
@@ -83,9 +80,8 @@ export const fetchSavedStatus = async (listingId) => {
 }
 
 export const saveListing = async (listingId) => {
-  const res = await fetch(`/api/saved/${listingId}`, {
+  const res = await apiFetch(`/api/saved/${listingId}`, {
     method: 'POST',
-    credentials: 'include',
   })
   const data = await parseJson(res)
   if (!res.ok) {
@@ -95,9 +91,8 @@ export const saveListing = async (listingId) => {
 }
 
 export const unsaveListing = async (listingId) => {
-  const res = await fetch(`/api/saved/${listingId}`, {
+  const res = await apiFetch(`/api/saved/${listingId}`, {
     method: 'DELETE',
-    credentials: 'include',
   })
   const data = await parseJson(res)
   if (!res.ok) {

@@ -16,9 +16,22 @@ const PORT = process.env.PORT || 5000
 
 app.use(express.json())
 app.use(cookieParser())
+
+// CLIENT_ORIGIN can be a single origin or a comma-separated list (e.g. the
+// Vercel production URL + per-branch preview URLs).
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow same-origin / curl / server-side requests with no Origin header.
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      return callback(new Error(`Origin ${origin} not allowed by CORS`))
+    },
     credentials: true,
   })
 )

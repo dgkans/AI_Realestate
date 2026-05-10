@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { parseJson } from '../utils/api.js'
+import { apiFetch, parseJson } from '../utils/api.js'
 
 const AuthContext = createContext(null)
 
@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   const refreshMe = async () => {
     try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' })
+      const res = await apiFetch('/api/auth/me')
       const data = await parseJson(res)
       if (!res.ok) {
         setCurrentUser(null)
@@ -26,10 +26,9 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async ({ email, password }) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ email, password }),
     })
     const data = await parseJson(res)
@@ -41,10 +40,9 @@ export function AuthProvider({ children }) {
   }
 
   const register = async ({ username, email, password }) => {
-    const res = await fetch('/api/auth/register', {
+    const res = await apiFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ username, email, password }),
     })
     const data = await parseJson(res)
@@ -56,7 +54,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await apiFetch('/api/auth/logout', { method: 'POST' })
     setCurrentUser(null)
   }
 
