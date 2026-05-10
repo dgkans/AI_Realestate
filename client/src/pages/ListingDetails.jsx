@@ -80,6 +80,12 @@ export default function ListingDetails() {
 
   const handleAnalyzeWithAi = async () => {
     if (!listing) return
+    if (listing.type === 'rent') {
+      setAiError(
+        'AI valuation is only available for sale listings. The price model is trained on sale prices.'
+      )
+      return
+    }
     setAiLoading(true)
     setAiError('')
     setAiResult(null)
@@ -300,12 +306,21 @@ export default function ListingDetails() {
                     {saveBusy ? 'Updating…' : saved ? 'Saved' : 'Save listing'}
                   </Button>
                 )}
-                <Button variant="outline">Message Agent</Button>
-                <Button variant="outline" onClick={handleAnalyzeWithAi} disabled={aiLoading}>
-                  {aiLoading ? 'Analyzing…' : 'Analyze with AI'}
-                </Button>
+                {listing.type === 'rent' ? (
+                  <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-3 text-xs text-slate-300">
+                    <p className="font-semibold text-slate-200">AI valuation unavailable for rentals</p>
+                    <p className="mt-1 text-slate-400">
+                      The price model is trained on King County <em>sale</em> data, so it can&apos;t reliably evaluate
+                      monthly rents. A dedicated rental model is on the roadmap.
+                    </p>
+                  </div>
+                ) : (
+                  <Button variant="outline" onClick={handleAnalyzeWithAi} disabled={aiLoading}>
+                    {aiLoading ? 'Analyzing…' : 'Analyze with AI'}
+                  </Button>
+                )}
               </div>
-              {aiError && (
+              {aiError && listing.type !== 'rent' && (
                 <p className="mt-3 text-xs text-red-400">
                   {aiError}
                 </p>
