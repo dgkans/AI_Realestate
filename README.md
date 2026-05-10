@@ -1,4 +1,4 @@
-# AI in Real Estate
+# Transforming Real Estate with AI
 
 A full-stack real estate platform that pairs a polished React UI with a machine-learning service for **AI-assisted price analysis** and a **rule-based investment advisor**. Buyers, sellers, and investors can browse listings, post their own, save favorites, and click **Analyze with AI** on any property to instantly see whether it is fairly priced relative to comparable homes — along with a personalized recommendation that takes their budget and risk appetite into account.
 
