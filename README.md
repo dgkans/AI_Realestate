@@ -50,6 +50,12 @@ Behind the scenes:
 ### Profile & Preferences (budget + risk tolerance)
 ![Profile Update](screens/ProfileUpdate.png)
 
+### Analyze with AI (price prediction, deviation, pricing flag, confidence, advisor)
+![Analyze with AI](screens/AnalyzewithAI.png)
+
+### Comparable Properties (KNN-retrieved similar past sales)
+![Comparable Properties](screens/ComparableProperties.png)
+
 ---
 
 ## Features
